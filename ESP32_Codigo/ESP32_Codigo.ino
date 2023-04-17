@@ -8,166 +8,248 @@
 //WI-Fi
 #include "config.h"
 
-//I2C
-#include "Wire.h"
-#include <Arduino.h>
+// Servo
+
+//LCD
+#include <LiquidCrystal.h>
+
+//Keypad 
+#include <Keypad.h>
+
+//Strings
+#include <string.h>
+
+//RTC
+#include <ESP32Time.h>
 
 /****************************** Variables ***********************************/
-int rojo = 0;
-int azul = 0;
-int verde = 0;
-int linea = 0;
-int mobi = 0;
-int estado = 0;
-uint32_t i = 0;
+int pos = 0;        
 
-#define I2C_DEV_ADDR 0x48
-#define SDA_PIN 21
-#define SCL_PIN 22
+int DOOR = 0; 
 
-/************************ Prototipe of Function ******************************/
+String password = "5280";
+String passclose = "0000";
 
-/******************************** Main ***************************************/
-void onReceive(int len){
+int cont = 0;
+int temp = 0;
+int temporal = 1;
 
-  while(Wire.available()){
-    //rojo = Wire.read();
-    //verde = Wire.read();
-    //azul = Wire.read();
-    estado = Wire.read();
-    mobi = Wire.read();
-    linea = Wire.read();
-  }
+const int buttonPinOpen = 35;
+const int buttonPinClose = 34;
 
-}
+int buttonStateOpen = 0;  
+int buttonStateClose = 0;
 
-void onRequest(){
-  Wire.print(i++);
-  Wire.print(" Packets.");
-  Serial.println("onRequest");
-}
+int i = 10;
+int n = 0;
 
+int k = 6;
+int j = 0;
+
+char myArray[4]={};
+char Array[4]={};
+
+const byte ROWS = 4;
+const byte COLS = 4;
+
+char Keys[ROWS][COLS] = {
+  {'1','2','3','A'},
+  {'4','5','6','B'},
+  {'7','8','9','C'},
+  {'*','0','#','D'}
+};
+
+byte rowPins[ROWS] = {13,12,14,27};
+byte colPins[COLS] = {26,25,33,32};
+
+/************************ Prototipo de Funcion *******************************/
+
+/******************************* Main ****************************************/
 // set up the feeds
-AdafruitIO_Feed *rojofeed = io.feed("Rojo");
-AdafruitIO_Feed *azulfeed = io.feed("Azul");
-AdafruitIO_Feed *verdefeed = io.feed("Verde");
-AdafruitIO_Feed *lineafeed = io.feed("Linea");
-AdafruitIO_Feed *mobydickfeed = io.feed("Movimiento");
+/*
+AdafruitIO_Feed *counter = io.feed("Lots");
+AdafruitIO_Feed *temperaturefeed = io.feed("Temperature");
+AdafruitIO_Feed *proximityfeed = io.feed("Proximity");
+AdafruitIO_Feed *rotfeed = io.feed("Rotation");
+*/
 
-void setup() {
-  
+// set up the LCD Pins
+LiquidCrystal lcd(19,23,18,17,16,21);
+
+// set up the Keypad 
+Keypad myKeypad = Keypad(makeKeymap(Keys), rowPins, colPins, ROWS, COLS);
+
+void setup(){
+  pinMode(buttonPinOpen, INPUT);
+  pinMode(buttonPinClose, INPUT);
+
   // start the serial connection 
-  
+  Serial.begin(9600);             // 9600 
 
-  Wire.onReceive(onReceive);
-  Wire.onRequest(onRequest);
-  Wire.begin((uint8_t)I2C_DEV_ADDR);
-
-  Serial.begin(9600);                                // 9600 
-  
   // wait for serial monitor to open
   while(! Serial);
 
-  Serial.print("Connecting to Adafruit IO");
-  
-  // connect to io.adafruit.com
-  io.connect();
-  
-  // set up a message handler for the count feed.
-  // the handleMessage function (defined below)
-  // will be called whenever a message is
-  // received from adafruit io.
-  // rotfeed->onMessage(handleMessage);
-
-  // wait for a connection
-  while(io.status() < AIO_CONNECTED) {
-    Serial.print(".");
-    delay(500);
-  }
-
-  // Because Adafruit IO doesn't support the MQTT retain flag, we can use the
-  // get() function to ask IO to resend the last value for this feed to just
-  // this MQTT client after the io client is connected.
-  //** rotfeed->get();
-
-  // we are connected
-  Serial.println();
-  Serial.println(io.statusText());
+  // Número de Columnas y Filas de nuestra LCD 2x16
+  lcd.begin(16,2);
+  lcd.setCursor(0, 0);
+  lcd.print("Carlos' Room");
+  lcd.setCursor(0, 1);
+  lcd.print("Enter key ____");
 }
 
-void loop() {
-  
-  // io.run(); is required for all sketches.
-  // it should always be present at the top of your loop
-  // function. it keeps the client connected to
-  // io.adafruit.com, and processes any incoming data.
-  io.run();
+void loop(){
+  buttonStateOpen = digitalRead(buttonPinOpen);
+  buttonStateClose = digitalRead(buttonPinClose);
 
-  if (estado == 0){
-    rojo = 0;
-    verde = 0;
-    azul = 0;
+  char key = myKeypad.getKey();
+  if ( (key) && (i<=13) && (DOOR == 0) ){
+    lcd.setCursor(i,1);
+    lcd.print(key);
+    myArray[n] = key;
+    n = n+1;
+    i = i+1;
   }
 
-  else if (estado == 1){
-    rojo = 0;
-    verde = 1;
-    azul = 0;
+  else if ( (i>13) && (myArray[0]==password[0]) && (myArray[1]==password[1]) && (myArray[2]==password[2]) && (myArray[3]==password[3]) && (DOOR == 0) ){
+    secuencia_de_apertura();
   }
 
-  else if (estado == 2){
-    rojo = 0;
-    verde = 0;
-    azul = 1;
+  else if ( (i>13) && (DOOR == 0) ){
+    n = 0;
+    i = 10;
+    for (int i = 0; i < 4; i++) {
+      myArray[i] = '\0';
+    }
+    lcd.setCursor(0,1);
+    lcd.print("Incorrect key!");
+    delay(2000);                      // wait for a second 
+    lcd.setCursor(0, 1);
+    lcd.print("Enter key ____");
   }
 
+  else if ( (buttonStateOpen == HIGH) && (DOOR ==0) ){
+    secuencia_de_apertura();
+  }
+
+  else if ( DOOR == 1 ) {
+
+    if (cont == 0){
+      lcd.setCursor(2,0);
+      lcd.print("DOOR IS OPEN");
+
+      lcd.setCursor(6,1);
+      lcd.print("____");
+      cont = 1;
+    }
+
+    if ( (key) && (k<=9) ){
+      lcd.setCursor(k,1);
+      lcd.print(key);
+      Array[j] = key;
+      j = j+1;
+      k = k+1;
+    }
+
+    else if (k>9){
+      k = 6;
+      j = 0;
+      for (int i = 0; i < 4; i++) {
+        Array[i] = '\0';
+      }
+      lcd.setCursor(6,1);
+      lcd.print("!!!!");
+      delay(2000); 
+      lcd.setCursor(6,1);
+      lcd.print("____");
+    }
+
+    if ( (Array[0] == passclose[0]) && (Array[1] == passclose[1]) && (Array[2] == passclose[2]) && (Array[3] == passclose[3]) ){
+      secuencia_de_cierre();
+    }
+    
+    if (buttonStateClose == HIGH){
+      secuencia_de_cierre();
+    }
+  }
+
+  /*
   else{
-    rojo = 1;
-    verde = 0;
-    azul = 0;
+    lcd.setCursor(0,0);
+    lcd.print("HUBO ERROR!!!!");
+    lcd.setCursor(0,1);
+    lcd.print("HUBO ERROR!!!!");
   }
+  */
 
-  // Enviamos Identificación del color "Rojo"
-  Serial.print("sending -> ");
-  Serial.println(rojo);
-  rojofeed->save(rojo);
-  
-  // Enviamos Identificación del color "Azul"
-  Serial.print("sending -> ");
-  Serial.println(azul);
-  azulfeed->save(azul);
-  
-  // Enviamos Identificación del color "Verde"
-  Serial.print("sending -> ");
-  Serial.println(verde);
-  verdefeed->save(verde);
-  
-  // Enviamos Reconocimiento de Objetos Cercanos 
-  Serial.print("sending -> ");
-  Serial.println(mobi);
-  mobydickfeed->save(mobi);
-  
-  // Enviamos Reconocimiento de Linea
-  Serial.print("sending -> ");
-  Serial.println(linea);
-  lineafeed->save(linea);
-
-  Serial.print(Wire.read());
-  // Adafruit IO is rate limited for publishing, so a delay is required in
-  // between feed->save events. In this example, we will wait three seconds
-  // (1000 milliseconds == 1 second) during each loop.
-  
-  delay(3000);
+  //lcd.setCursor(0, 1);
+  //lcd.print(millis()/1000);
 }
 
-// this function is called whenever a 'counter' message
-// is received from Adafruit IO. it was attached to
-// the counter feed in the setup() function above.
+void secuencia_de_cierre(){
+  k = 6;
+  j = 0;
+  for (int i = 0; i < 4; i++) {
+    Array[i] = '\0';
+    }
+  DOOR = 0; 
+  cont = 0;
+  
+  lcd.clear();
+  // Dejamos saber a la persona que la puerta está abriendose 
+  lcd.setCursor(0,1);
+  lcd.print("Door Closing");
+  delay(1000);                      // wait for a second 
+  lcd.clear();
 
-void handleMessage(AdafruitIO_Data *data) {
+  lcd.setCursor(0,1);
+  lcd.print("Door Closing.");
+  delay(1000);                      // wait for a second 
+  lcd.clear();
 
-  Serial.print("received <- ");
-  Serial.println(data->value());
+  lcd.setCursor(0,1);
+  lcd.print("Door Closing..");
+  delay(1000);                      // wait for a second 
+  lcd.clear();
 
-  delay(1);
+  lcd.setCursor(0,1);
+  lcd.print("Door Closing...");
+  delay(1000);                      // wait for a second 
+  lcd.clear(); 
+
+  lcd.setCursor(0, 0);
+  lcd.print("Carlos' Room");
+  lcd.setCursor(0, 1);
+  lcd.print("Enter key ____");
+}
+
+void secuencia_de_apertura(){
+  n = 0;
+  i = 10;
+  for (int i = 0; i < 4; i++) {
+    myArray[i] = '\0';
+    }
+  DOOR = 1;
+
+  lcd.clear();
+  // Dejamos saber a la persona que la puerta está abriendose 
+  lcd.setCursor(0,1);
+  lcd.print("Door Opening");
+  delay(1000);                      // wait for a second 
+  lcd.clear();
+
+  lcd.setCursor(0,1);
+  lcd.print("Door Opening.");
+  delay(1000);                      // wait for a second 
+  lcd.clear();
+
+  lcd.setCursor(0,1);
+  lcd.print("Door Opening..");
+  delay(1000);                      // wait for a second 
+  lcd.clear();
+
+  lcd.setCursor(0,1);
+  lcd.print("Door Opening...");
+  delay(1000);                      // wait for a second 
+  lcd.clear();   
+
 }
