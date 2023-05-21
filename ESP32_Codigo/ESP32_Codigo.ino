@@ -9,6 +9,7 @@
 #include "config.h"
 
 // Servo
+#include <ESP32Servo.h>
 
 //LCD
 #include <LiquidCrystal.h>
@@ -23,12 +24,15 @@
 #include <ESP32Time.h>
 
 /****************************** Variables ***********************************/
-int pos = 0;        
-
 int DOOR = 0; 
 
 String password = "5280";
 String passclose = "0000";
+
+Servo servo;
+
+int minUs = 1000;
+int maxUs = 2000;
 
 int cont = 0;
 int temp = 0;
@@ -62,6 +66,7 @@ char Keys[ROWS][COLS] = {
 byte rowPins[ROWS] = {13,12,14,27};
 byte colPins[COLS] = {26,25,33,32};
 
+
 /************************ Prototipo de Funcion *******************************/
 
 /******************************* Main ****************************************/
@@ -74,7 +79,7 @@ AdafruitIO_Feed *rotfeed = io.feed("Rotation");
 */
 
 // set up the LCD Pins
-LiquidCrystal lcd(19,23,18,17,16,21);
+LiquidCrystal lcd(19,23,18,17,16,4);
 
 // set up the Keypad 
 Keypad myKeypad = Keypad(makeKeymap(Keys), rowPins, colPins, ROWS, COLS);
@@ -82,10 +87,13 @@ Keypad myKeypad = Keypad(makeKeymap(Keys), rowPins, colPins, ROWS, COLS);
 void setup(){
   pinMode(buttonPinOpen, INPUT);
   pinMode(buttonPinClose, INPUT);
+  //pinMode(15, OUTPUT);
+
+  servo.attach(15);
 
   // start the serial connection 
   Serial.begin(9600);             // 9600 
-
+  
   // wait for serial monitor to open
   while(! Serial);
 
@@ -183,6 +191,7 @@ void loop(){
 
   //lcd.setCursor(0, 1);
   //lcd.print(millis()/1000);
+	
 }
 
 void secuencia_de_cierre(){
@@ -220,6 +229,11 @@ void secuencia_de_cierre(){
   lcd.print("Carlos' Room");
   lcd.setCursor(0, 1);
   lcd.print("Enter key ____");
+
+  for (int angle = 180; angle >= 0; angle--) {
+      servo.write(angle);
+      delay(15);
+  }
 }
 
 void secuencia_de_apertura(){
@@ -252,4 +266,8 @@ void secuencia_de_apertura(){
   delay(1000);                      // wait for a second 
   lcd.clear();   
 
+  for (int angle = 0; angle <= 180; angle++) {
+      servo.write(angle);
+      delay(15); // Delay to allow the servo to reach the desired position
+    }
 }
